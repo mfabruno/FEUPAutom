@@ -1,0 +1,10 @@
+# User-specific files
+*.o
+*.ppu
+*.obj
+*.ini
+*.rsj
+backup/
+*.dbg
+*.exe
+*.compiled
