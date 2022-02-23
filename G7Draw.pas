@@ -408,6 +408,8 @@ type
     function  GetStepIdx(const SearchName: string): integer;
     function  GetObjIdx(const SearchName: string): integer;
 //    procedure FlickerMode(const FullDrawWithFlicker: boolean);
+    procedure AppendZone(const source : TStrings;const CurPage:integer;const nameOfZone : string);
+    procedure AppendTitle(const source : TStrings;const CurPage:integer;const nameOfZone : string);
 
   public
     MouseDownX, MouseDownY : integer;
@@ -4563,7 +4565,35 @@ begin
 
 end;
 
+procedure TFormG7.AppendZone(const source : TStrings;const CurPage:integer;const nameOfZone : string);
+var
+  i : integer;
+begin
+    i := GetStepIdx(nameOfZone);
+    if (i>=0) and (G7Objects[i].Page=CurPage) then begin
+      source.Append('');
+      source.Append('');
+      source.Append('////////////////////////////////////////////////////////////');
+      source.Append('////////////////////////// '+nameOfZone+' ///////////////////////////');
+      source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
+      source.Append('////////////////////////////////////////////////////////////');
+      source.Append('');
 
+      MySpecialAppend(source,G7Objects[i].Code,' ');
+      //source.Append(G7Objects[i].Code);
+    end;
+
+end;
+
+procedure TFormG7.AppendTitle(const source : TStrings;const CurPage:integer;const title : string);
+begin
+    source.Append('');
+    source.Append('////////////////////////////////////////////////////////////');
+    source.Append(title);
+    source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
+    source.Append('////////////////////////////////////////////////////////////');
+    source.Append('');
+end;
 
 function TFormG7.GenSTCode(InteratctiveMode: Boolean = True) : Boolean;
 var
@@ -4657,34 +4687,15 @@ begin
   source.Append('////////////////////////////////////////////////////////////');
 
   for CurPage:=TBPage.Max DownTo TBPage.Min do begin
+
     source.Append('');
     source.Append(       '//######################################//');
     source.Append(Format('//################ Page%2d ##############//',[CurPage]));
     source.Append(       '//######################################//');
 
-    i := GetStepIdx('Zone1');
-    if (i>=0) and (G7Objects[i].Page=CurPage) then begin
-      source.Append('');
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('////////////////////////// Zone1 ///////////////////////////');
-      source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('');
-
-      MySpecialAppend(source,G7Objects[i].Code,' ');
-      //source.Append(G7Objects[i].Code);
-    end;
-
-
-
-
-    source.Append('');
-    source.Append('////////////////////////////////////////////////////////////');
-    source.Append('///////////// If boot => Set Initial Steps /////////////////');
-    source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-    source.Append('////////////////////////////////////////////////////////////');
-    source.Append('');
-
+    //-------------------------------Zone1--------------------------------------
+    AppendZone(source, CurPage, 'Zone1');
+    AppendTitle(source, CurPage, '///////////// If boot => Set Initial Steps /////////////////');
 
     source.Add('  If (sw0=0) Then');
     for i:=0 to MAXG7Objects-1 do begin
@@ -4699,29 +4710,13 @@ begin
     end;
     source.Add('  End_If;');
 
-
-    i := GetStepIdx('Zone2');
-    if (i>=0) and (G7Objects[i].Page=CurPage) then begin
-      source.Append('');
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('////////////////////////// Zone2 ///////////////////////////');
-      source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('');
-      MySpecialAppend(source,G7Objects[i].Code,' ');
-      //source.Append(G7Objects[i].Code);
-    end;
+    //-------------------------------Zone2--------------------------------------
+    AppendZone(source, CurPage, 'Zone2');
+    AppendTitle(source, CurPage, '///////////////// Calc Fired Transitions ///////////////////');
 
 
     // ** Allow action for ini step with below true transition');
     source.Append('if (sw0>0) then  // ** Prevent evolution in initial cycle');
-
-    source.Append('');
-    source.Append('////////////////////////////////////////////////////////////');
-    source.Append('///////////////// Calc Fired Transitions ///////////////////');
-    source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-    source.Append('////////////////////////////////////////////////////////////');
-    source.Append('');
 
     for i:=0 to MAXG7Objects-1 do begin
       if  (G7Objects[i].Page<>CurPage) then Continue;
@@ -4763,29 +4758,11 @@ begin
       end;
     end;
 
-    // ** Allow action for ini step with below true transition');
     source.Append('end_if; //** Prevent evolution in initial cycle');
 
-    i := GetStepIdx('Zone3');
-    if (i>=0) and (G7Objects[i].Page=CurPage) then begin
-      source.Append('');
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('////////////////////////// Zone3 ///////////////////////////');
-      source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('');
-      MySpecialAppend(source,G7Objects[i].Code,' ');   ////// Has a bug from Delphi, strange lines count
-      //source.Append(G7Objects[i].Code);
-    end;
-
-
-
-    source.Append('');
-    source.Append('////////////////////////////////////////////////////////////');
-    source.Append('///////////////// ReSet Steps Above fired Tr ///////////////');
-    source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-    source.Append('////////////////////////////////////////////////////////////');
-    source.Append('');
+    //-------------------------------Zone3--------------------------------------
+    AppendZone(source, CurPage, 'Zone3');
+    AppendTitle(source, CurPage, '///////////////// ReSet Steps Above fired Tr ///////////////');
 
     cnt := 0;
     for i:=0 to MAXG7Objects-1 do begin
@@ -4817,27 +4794,10 @@ begin
       end;
       inc(cnt);
     end;
-
-    i := GetStepIdx('Zone4');
-    if (i>=0) and (G7Objects[i].Page=CurPage) then begin
-      source.Append('');
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('////////////////////////// Zone4 ///////////////////////////');
-      source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('');
-      MySpecialAppend(source,G7Objects[i].Code,' ');
-      //source.append(G7Objects[i].Code);
-    end;
-
-
-
-    source.Append('');
-    source.Append('////////////////////////////////////////////////////////////');
-    source.Append('///////////////// Set Steps below fired Tr /////////////////');
-    source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-    source.Append('////////////////////////////////////////////////////////////');
-    source.Append('');
+                   
+    //-------------------------------Zone4--------------------------------------
+    AppendZone(source, CurPage, 'Zone4');
+    AppendTitle(source, CurPage, '///////////////// Set Steps below fired Tr /////////////////');
 
     cnt := 0;
     for i:=0 to MAXG7Objects-1 do begin
@@ -4876,20 +4836,9 @@ begin
       end;
       inc(cnt);
     end;
-
-    i := GetStepIdx('Zone5');
-    if (i>=0) and (G7Objects[i].Page=CurPage) then begin
-      source.Append('');
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('////////////////////////// Zone5 ///////////////////////////');
-      source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('');
-      MySpecialAppend(source,G7Objects[i].Code,' ');
-      //source.append(G7Objects[i].Code);
-    end;
-
-
+                
+    //-------------------------------Zone5--------------------------------------
+    AppendZone(source, CurPage, 'Zone5');
 
     if MenuCBResetOutsAtStartCycle.Checked then
       if ((CurPage=TBPage.Max) AND not(MenuStartQAtPg2.Checked))  or
@@ -4924,31 +4873,9 @@ begin
 
     end;
 
-
-
-    i := GetStepIdx('Zone6');
-    if (i>=0) and (G7Objects[i].Page=CurPage) then begin
-      source.Append('');
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('////////////////////////// Zone6 ///////////////////////////');
-      source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('');
-      MySpecialAppend(source,G7Objects[i].Code,' ');
-      //source.append(G7Objects[i].Code);
-    end;
-
-
-
-
-
-    source.Append('');
-    source.Append('////////////////////////////////////////////////////////////');
-    source.Append('///// If step active increment MW timer of step @ %s16 /////');
-    source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-    source.Append('////////////////////////////////////////////////////////////');
-    source.Append('');
-
+    //-------------------------------Zone6--------------------------------------
+    AppendZone(source, CurPage, 'Zone6');
+    AppendTitle(source, CurPage, '///// If step active increment MW timer of step @ %s16 /////');
 
     for i:=0 to MAXG7Objects-1 do begin
       if  (G7Objects[i].Page<>CurPage) then Continue;
@@ -4961,27 +4888,9 @@ begin
       end;
     end;
 
-
-    i := GetStepIdx('Zone7');
-    if (i>=0) and (G7Objects[i].Page=CurPage) then begin
-      source.Append('');
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('////////////////////////// Zone7 ///////////////////////////');
-      source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('');
-      MySpecialAppend(source,G7Objects[i].Code,' ');
-      //source.append(G7Objects[i].Code);
-    end;
-
-
-
-    source.Append('');
-    source.Append('////////////////////////////////////////////////////////////');
-    source.Append('//////// If step active, execute its action code ///////////');
-    source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-    source.Append('////////////////////////////////////////////////////////////');
-    source.Append('');
+    //-------------------------------Zone7--------------------------------------
+    AppendZone(source, CurPage, 'Zone7');
+    AppendTitle(source, CurPage, '//////// If step active, execute its action code ///////////');
 
     for i:=0 to MAXG7Objects-1 do begin
       if (G7Objects[i].G7Type <> g7oStep) then continue;
@@ -5033,18 +4942,9 @@ begin
         source.Append('  End_If;');
       end;
     end;
-
-    i := GetStepIdx('Zone8');
-    if (i>=0) and (G7Objects[i].Page=CurPage) then begin
-      source.Append('');
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('////////////////////////// Zone8 ///////////////////////////');
-      source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('');
-
-      MySpecialAppend(source,G7Objects[i].Code,' ');
-    end;
+                     
+    //-------------------------------Zone8--------------------------------------
+    AppendZone(source, CurPage, 'Zone8');
 
   end; // __end_cur_page___
 
