@@ -409,7 +409,7 @@ type
     function  GetObjIdx(const SearchName: string): integer;
 //    procedure FlickerMode(const FullDrawWithFlicker: boolean);
     procedure AppendZone(const source : TStrings;const CurPage:integer;const nameOfZone : string);
-    procedure AppendTitle(const source : TStrings;const CurPage:integer;const nameOfZone : string);
+    procedure AppendTitle(const source : TStrings;const CurPage:integer;const title : string);
 
   public
     MouseDownX, MouseDownY : integer;
@@ -4603,6 +4603,8 @@ var
   source : TStrings;
   StartLineMBit,StartLineMW : integer;
   WarnNoIniStep : boolean;
+  
+  currentObject: TG7Object;
 begin
 
   result:=false;
@@ -4645,40 +4647,42 @@ begin
   // Setup Pretty Names for Transitions, Steps and Step_Times
   ////FVariables.SetDefaultNames(FALSE);  // Maio de 2018 // does not fix
   for i:=0 to MAXG7Objects-1 do begin
-    if G7Objects[i].G7Type = g7oStep then begin
+
+	currentObject:= G7Objects[i];
+  
+  
+    if currentObject.G7Type = g7oStep then begin
       // May 2018 - Carefully delete old (may be obsolete) var names
       // and recreate them in the correct place
-      li := SearchVarInSGVars(G7Objects[i].name);
+      li := SearchVarInSGVars(currentObject.name);
       if li>-1 then with FVAriables do
         SGVars.Cells[1,li] := PercentNameToSimplexName(SGVars.Cells[0,li]);
-      li := SearchVarInSGVars(G7Objects[i].name+'_t');
+      li := SearchVarInSGVars(currentObject.name+'_t');
       if li>-1 then with FVAriables do
         SGVars.Cells[1,li] := PercentNameToSimplexName(SGVars.Cells[0,li]);
       // Assign new names as usual
       // ToDo: create variables pretty, one after the other, together, no "waste"
-      FVAriables.SGVars.Cells[1,StartLineMbit+i] := G7Objects[i].name;
-      FVAriables.SGVars.Cells[1,StartLineMW+i]   := G7Objects[i].name+'_t';
-    end else
-    if G7Objects[i].G7Type = g7oTransition then begin
-      li := SearchVarInSGVars(G7Objects[i].name);
+      FVAriables.SGVars.Cells[1,StartLineMbit+i] := currentObject.name;
+      FVAriables.SGVars.Cells[1,StartLineMW+i]   := currentObject.name+'_t';
+    end 
+	else if currentObject.G7Type = g7oTransition then begin
+      li := SearchVarInSGVars(currentObject.name);
       if li>-1 then with FVAriables do
         SGVars.Cells[1,li] := PercentNameToSimplexName(SGVars.Cells[0,li]);
-      FVAriables.SGVars.Cells[1,StartLineMbit+i] := G7Objects[i].name;
+      FVAriables.SGVars.Cells[1,StartLineMbit+i] := currentObject.name;
     end;
     if (i>=MaxMemBits) and
-       ((G7Objects[i].G7Type = g7oTransition) or (G7Objects[i].G7Type = g7oStep)) then begin
+       ((currentObject.G7Type = g7oTransition) or (currentObject.G7Type = g7oStep)) then begin
       source.Append('');
       source.Append('////////////////////////////////////////////////////////////');
       source.Append('// ' + VersionString);
-      source.Append('// Out of memory starting on '+G7Objects[i].name);
+      source.Append('// Out of memory starting on '+currentObject.name);
       source.Append('////////////////////////////////////////////////////////////');
-      FMain.LBErrors.Items.Append('Out of memory starting on '+G7Objects[i].name);
-      if InteratctiveMode and (UpperCase(ParamStr(1))<>'-R') then ShowMessage('Out of memory starting on '+G7Objects[i].name);
+      FMain.LBErrors.Items.Append('Out of memory starting on '+currentObject.name);
+      if InteratctiveMode and (UpperCase(ParamStr(1))<>'-R') then ShowMessage('Out of memory starting on '+currentObject.name);
       exit;
     end;
   end;
-
-
 
   source.Append('');
   source.Append('////////////////////////////////////////////////////////////');
@@ -4686,7 +4690,7 @@ begin
   source.Append('// Code Automatically Generated:'+DateTimeToStr(Now));
   source.Append('////////////////////////////////////////////////////////////');
 
-  for CurPage:=TBPage.Max DownTo TBPage.Min do begin
+  for CurPage := TBPage.Max DownTo TBPage.Min do begin
 
     source.Append('');
     source.Append(       '//######################################//');
@@ -4699,14 +4703,18 @@ begin
 
     source.Add('  If (sw0=0) Then');
     for i:=0 to MAXG7Objects-1 do begin
-      if  (G7Objects[i].Page<>CurPage) then Continue;
-      if G7Objects[i].G7Type = g7oStep then begin
-        if g7fInitial in G7Objects[i].Flags then begin
-          WarnNoIniStep := False;
-          source.Add(Format('  // ObjIdx=%d => INI_Step "%s"',[i,G7Objects[i].name]));
-          source.Add('    '+G7Objects[i].name+' := True;');
-        end;
-      end;
+		
+		currentObject:= G7Objects[i];
+		
+		if (currentObject.Page <> CurPage) then Continue;
+		if (currentObject.G7Type <> g7oStep) then Continue;
+	  
+		if (g7fInitial in currentObject.Flags) then begin
+		  WarnNoIniStep := False;
+		  source.Add(Format('  // ObjIdx=%d => INI_Step "%s"',[i,currentObject.name])); 
+		  source.Add('    '+currentObject.name+' := True;');
+		end;
+		
     end;
     source.Add('  End_If;');
 
@@ -4719,43 +4727,50 @@ begin
     source.Append('if (sw0>0) then  // ** Prevent evolution in initial cycle');
 
     for i:=0 to MAXG7Objects-1 do begin
-      if  (G7Objects[i].Page<>CurPage) then Continue;
-      if G7Objects[i].G7Type = g7oTransition then begin
-        source.Add(Format('// ObjIdx=%d => Transition "%s"',[i,G7Objects[i].name]));
-        s:='  // Steps Above: ';
-        for j:=0 to CompilGr7[i].AboveCount-1 do
-          s:=s+ format('id=%d => %s ;',[CompilGr7[i].Above[j], G7Objects[CompilGr7[i].Above[j]].Name]);
-        source.Append(s);
-        s:='  // Steps Below: ';
-        for j:=0 to CompilGr7[i].BelowCount-1 do //s:=s+G7Objects[MyGr7[i].Below[j]].Name+'; ';
-          s:=s+ format('id=%d => %s ;',[CompilGr7[i].Below[j], G7Objects[CompilGr7[i].Below[j]].Name]);
-        source.Append(s);
+	
+		currentObject:= G7Objects[i];
+		
+		if  (currentObject.Page <> CurPage) then Continue;
+		if  (currentObject.G7Type <> g7oTransition) then Continue;
 
-        if (Trim(G7Objects[i].Code)='') then begin
-          if not InteratctiveMode then G7Objects[i].Code:='True' else begin
-            if (MessageDlg('Empty Transition ('+G7Objects[i].name+') is not allowed...'+crlf+
-                        'Set condition to "True"?',
-                         mtConfirmation, [mbYes, mbNo], 0) = mrYes) then begin  // If not interactive mode
-              G7Objects[i].Code:='True';
-              G7RedrawAll;
-            end;
-          end;
-        end;
+		source.Add(Format('// ObjIdx=%d => Transition "%s"',[i,currentObject.name]));
+		
+		s:='  // Steps Above: ';
+		for j:=0 to CompilGr7[i].AboveCount-1 do
+		  s:=s+ format('id=%d => %s ;',[CompilGr7[i].Above[j], G7Objects[CompilGr7[i].Above[j]].Name]);
+		source.Append(s);
+		
+		s:='  // Steps Below: ';
+		for j:=0 to CompilGr7[i].BelowCount-1 do //s:=s+G7Objects[MyGr7[i].Below[j]].Name+'; ';
+		  s:=s+ format('id=%d => %s ;',[CompilGr7[i].Below[j], G7Objects[CompilGr7[i].Below[j]].Name]);
+		source.Append(s);
 
-        // Build transition code
-        s:=  '  '+G7Objects[i].name+' := (not '+'%s10' + IntToStr(CurPage) + ') AND ( '; // prettify and open parentesis for freezing grafcet page
-        for j:=0 to CompilGr7[i].AboveCount-1 do begin
-          s:=s+' '+G7Objects[compilGr7[i].Above[j]].Name+' AND ';    // _MemBits[5] :=  _MemBits[2] AND  ((_InBitsFunc[1]()))
-        end;
-        if  ((CompilGr7[i].AboveCount-1)>0) and
-            (UpperCase(trim(G7Objects[i].Code))='TRUE') then begin  // a ver para deixar de dar warnings
-          s := MidStr(s,1,length(s)-5);
-        end else begin
-          s:=s+' ('+trim(G7Objects[i].Code)+')';
-        end;
-        s:=s+' ) ;';  // close parentesis for freezing grafcet page
-        source.Append(s);
-      end;
+		if (Trim(currentObject.Code)='') then begin
+		  if not InteratctiveMode then currentObject.Code:='True' else begin
+			if (MessageDlg('Empty Transition ('+currentObject.name+') is not allowed...'+crlf+
+						'Set condition to "True"?',
+						 mtConfirmation, [mbYes, mbNo], 0) = mrYes) then begin  // If not interactive mode
+			  currentObject.Code:='True';
+			  G7RedrawAll;
+			end;
+		  end;
+		end;
+
+		// Build transition code
+		s:=  '  '+currentObject.name+' := (not '+'%s10' + IntToStr(CurPage) + ') AND ( '; // prettify and open parentesis for freezing grafcet page
+		for j:=0 to CompilGr7[i].AboveCount-1 do begin
+		  s:=s+' '+G7Objects[compilGr7[i].Above[j]].Name+' AND ';    // _MemBits[5] :=  _MemBits[2] AND  ((_InBitsFunc[1]()))
+		end;
+		
+		if  ((CompilGr7[i].AboveCount-1)>0) and (UpperCase(trim(currentObject.Code))='TRUE') then begin  // a ver para deixar de dar warnings
+		  s := MidStr(s,1,length(s)-5);
+		end 
+		else begin
+		  s:=s+' ('+trim(currentObject.Code)+')';
+		end;
+		s:=s+' ) ;';  // close parentesis for freezing grafcet page
+		source.Append(s);
+
     end;
 
     source.Append('end_if; //** Prevent evolution in initial cycle');
@@ -4766,33 +4781,37 @@ begin
 
     cnt := 0;
     for i:=0 to MAXG7Objects-1 do begin
-      if  (G7Objects[i].Page<>CurPage) then Continue;
-      if cnt >= G7ObjectsCount then break;
-      if G7Objects[i].G7Type = g7oEmpty then continue;
-      //if G7Objects[i].G7Type = g7oTransition then begin
-      if G7Objects[i].G7Type = g7oTransition then begin
-        source.Add(Format('// ObjIdx=%d => Transition "%s"',[i,G7Objects[i].name]));
-        s:='  // Steps Above: ';
-        for j:=0 to CompilGr7[i].AboveCount-1 do
-          s:=s+ format('id=%d => %s ;',[CompilGr7[i].Above[j], G7Objects[CompilGr7[i].Above[j]].Name]);
-        source.Append(s);
-        s:='  // Steps Below: ';
-        for j:=0 to CompilGr7[i].BelowCount-1 do //s:=s+G7Objects[MyGr7[i].Below[j]].Name+'; ';
-          s:=s+ format('id=%d => %s ;',[CompilGr7[i].Below[j], G7Objects[CompilGr7[i].Below[j]].Name]);
-        source.Append(s);
+	
+		if cnt >= G7ObjectsCount then break;
+		
+		currentObject:= G7Objects[i];
+		if (currentObject.Page <>CurPage) then Continue;
+		if (currentObject.G7Type <> g7oTransition) then Continue;
+		
+		source.Add(Format('// ObjIdx=%d => Transition "%s"',[i,currentObject.name]));
+		
+		s:='  // Steps Above: ';
+		for j:=0 to CompilGr7[i].AboveCount-1 do
+		  s:=s+ format('id=%d => %s ;',[CompilGr7[i].Above[j], G7Objects[CompilGr7[i].Above[j]].Name]);
+		source.Append(s);
+		
+		s:='  // Steps Below: ';
+		for j:=0 to CompilGr7[i].BelowCount-1 do //s:=s+G7Objects[MyGr7[i].Below[j]].Name+'; ';
+		  s:=s+ format('id=%d => %s ;',[CompilGr7[i].Below[j], G7Objects[CompilGr7[i].Below[j]].Name]);
+		source.Append(s);
 
-        // If Tr fired, then
-        s:=  '  If ('+G7Objects[i].name+') Then';
-        source.Append(s);
-        // Reset Steps Above
-        s:='    ';
-        for j:=0 to CompilGr7[i].AboveCount-1 do
-          s := s + ' '+G7Objects[CompilGr7[i].Above[j]].name+':=False; ';
-        source.Append(s);
-        source.Append('  End_If;');
-
-      end;
-      inc(cnt);
+		// If Tr fired, then
+		s:=  '  If ('+currentObject.name+') Then';
+		source.Append(s);
+		// Reset Steps Above
+		s:='    ';
+		for j:=0 to CompilGr7[i].AboveCount-1 do
+		  s := s + ' '+G7Objects[CompilGr7[i].Above[j]].name+':=False; ';
+		source.Append(s);
+		source.Append('  End_If;');
+		
+		
+		inc(cnt);
     end;
                    
     //-------------------------------Zone4--------------------------------------
@@ -4801,75 +4820,73 @@ begin
 
     cnt := 0;
     for i:=0 to MAXG7Objects-1 do begin
-      if  (G7Objects[i].Page<>CurPage) then Continue;
-      if cnt >= G7ObjectsCount then break;
-      if G7Objects[i].G7Type = g7oEmpty then continue;
-      if G7Objects[i].G7Type = g7oTransition then begin
-        source.Add(Format('// ObjIdx=%d => Transition "%s"',[i,G7Objects[i].name]));
-        s:='  // Steps Above: ';
-        for j:=0 to CompilGr7[i].AboveCount-1 do
-          s:=s+ format('id=%d => %s ;',[CompilGr7[i].Above[j], G7Objects[CompilGr7[i].Above[j]].Name]);
-        source.Append(s);
-        s:='  // Steps Below: ';
-        for j:=0 to CompilGr7[i].BelowCount-1 do //s:=s+G7Objects[MyGr7[i].Below[j]].Name+'; ';
-          s:=s+ format('id=%d => %s ;',[CompilGr7[i].Below[j], G7Objects[CompilGr7[i].Below[j]].Name]);
-        source.Append(s);
+	
+		if cnt >= G7ObjectsCount then break;
+		
+		currentObject:= G7Objects[i];
+		if (currentObject.Page<>CurPage) then Continue;
+		if (currentObject.G7Type <> g7oTransition) then Continue;
+		
+		source.Add(Format('// ObjIdx=%d => Transition "%s"',[i,currentObject.name]));
+		
+		s:='  // Steps Above: ';
+		for j:=0 to CompilGr7[i].AboveCount-1 do
+		  s:=s+ format('id=%d => %s ;',[CompilGr7[i].Above[j], G7Objects[CompilGr7[i].Above[j]].Name]);
+		source.Append(s);
+		
+		s:='  // Steps Below: ';
+		for j:=0 to CompilGr7[i].BelowCount-1 do //s:=s+G7Objects[MyGr7[i].Below[j]].Name+'; ';
+		  s:=s+ format('id=%d => %s ;',[CompilGr7[i].Below[j], G7Objects[CompilGr7[i].Below[j]].Name]);
+		source.Append(s);
 
-
-        // If Tr fired, then
-        s:=  '  If ('+G7Objects[i].name+') Then ';
-        source.Append(s);
-        // Set Steps Below
-        s:='   ';
-        for j:=0 to CompilGr7[i].BelowCount-1 do begin
-          s := s + ' '+G7Objects[CompilGr7[i].Below[j]].name+' := True; ';
-        end;
-        source.Append(s);
-        s:='    ';
-        for j:=0 to CompilGr7[i].BelowCount-1 do begin
-          //s := s + 'mw'+inttostr(CompilGr7[i].Below[j])+':=0; ';
-          s := s + G7Objects[CompilGr7[i].Below[j]].name+'_T := 0; ';
-        end;
-        source.Append(s);
-        source.Append('  End_If;');
-
-      end;
-      inc(cnt);
+		// If Tr fired, then
+		s:=  '  If ('+currentObject.name+') Then ';
+		source.Append(s);
+		// Set Steps Below
+		s:='   ';
+		for j:=0 to CompilGr7[i].BelowCount-1 do begin
+		  s := s + ' '+G7Objects[CompilGr7[i].Below[j]].name+' := True; ';
+		end;
+		source.Append(s);
+		s:='    ';
+		for j:=0 to CompilGr7[i].BelowCount-1 do begin
+		  //s := s + 'mw'+inttostr(CompilGr7[i].Below[j])+':=0; ';
+		  s := s + G7Objects[CompilGr7[i].Below[j]].name+'_T := 0; ';
+		end;
+		source.Append(s);
+		source.Append('  End_If;');
+		
+		inc(cnt);
     end;
                 
     //-------------------------------Zone5--------------------------------------
-    AppendZone(source, CurPage, 'Zone5');
-
+	AppendZone(source, CurPage, 'Zone5');
+		
     if MenuCBResetOutsAtStartCycle.Checked then
       if ((CurPage=TBPage.Max) AND not(MenuStartQAtPg2.Checked))  or
          ((CurPage=2)          AND    (MenuStartQAtPg2.Checked)) then begin
 
-      source.Append('');
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('////////// Unset (Clear) all Outputs (once for all pages) //////////');
-      source.Append(Format('//####################### Page%2d ########################//',[CurPage]));
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('');
+		AppendTitle(source, CurPage, '////////// Unset (Clear) all Outputs (once for all pages) //////////');
 
-      for i:=1 to FVAriables.SGVars.RowCount-1  do begin
-        if (PercentNameToType(FVAriables.SGVars.Cells[0,i])='q') then begin
-          if (FVAriables.SGVars.Cells[1,i]<>'') then
-            source.Append('  '+FVAriables.SGVars.Cells[1,i]+':=False;')
-          else
-            source.Append('  '+FVAriables.SGVars.Cells[0,i]+':=False;')
-        end;
-      end;
+		for i:=1 to FVAriables.SGVars.RowCount-1  do begin
+			if (PercentNameToType(FVAriables.SGVars.Cells[0,i])='q') then begin
+				if (FVAriables.SGVars.Cells[1,i]<>'') then
+					source.Append('  '+FVAriables.SGVars.Cells[1,i]+':=False;')
+				else
+					source.Append('  '+FVAriables.SGVars.Cells[0,i]+':=False;')
+				end;
+			end;
 
-      source.Append('');
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('////////// Unset (Clear) Freeze System Bits       //////////');
-      source.Append('////////////////////////////////////////////////////////////');
-      source.Append('');
+		  source.Append('');
+		  source.Append('////////////////////////////////////////////////////////////');
+		  source.Append('////////// Unset (Clear) Freeze System Bits       //////////');
+		  source.Append('////////////////////////////////////////////////////////////');
+		  source.Append('');
 
-      source.Append('  %s100:=False;');
-      source.Append('  %s101:=False;');
-      source.Append('  %s102:=False;');
-      source.Append('  %s103:=False; // Should not be used');
+		  source.Append('  %s100:=False;');
+		  source.Append('  %s101:=False;');
+		  source.Append('  %s102:=False;');
+		  source.Append('  %s103:=False; // Should not be used');
 
     end;
 
@@ -4878,14 +4895,17 @@ begin
     AppendTitle(source, CurPage, '///// If step active increment MW timer of step @ %s16 /////');
 
     for i:=0 to MAXG7Objects-1 do begin
-      if  (G7Objects[i].Page<>CurPage) then Continue;
-      if G7Objects[i].G7Type = g7oStep then begin
-        source.Append(Format('  // ObjIdx=%d => Step "%s"',[i,G7Objects[i].name]));
+	
+		currentObject:= G7Objects[i];
+		if (currentObject.Page <> CurPage) then Continue;
+		if (currentObject.G7Type <> g7oStep) then Continue;
+		
+        source.Append(Format('  // ObjIdx=%d => Step "%s"',[i,currentObject.name]));
         // SysBit[Timer10Hz:=16] - active 1 cycle each 100 ms (100 ms approx)
-        source.Append('  If (s16) and ('+G7Objects[i].name+') Then ');
-        source.Append('    '+G7Objects[i].name+'_T := '+G7Objects[i].name+'_T+1'+';');
+        source.Append('  If (s16) and ('+currentObject.name+') Then ');
+        source.Append('    '+currentObject.name+'_T := '+currentObject.name+'_T+1'+';');
         source.Append('  end_if;');
-      end;
+      
     end;
 
     //-------------------------------Zone7--------------------------------------
@@ -4893,25 +4913,27 @@ begin
     AppendTitle(source, CurPage, '//////// If step active, execute its action code ///////////');
 
     for i:=0 to MAXG7Objects-1 do begin
-      if (G7Objects[i].G7Type <> g7oStep) then continue;
-      if (G7Objects[i].Page<>CurPage) then Continue;
+	
+		currentObject:= G7Objects[i];
+		if (currentObject.Page <> CurPage) then Continue;
+		if (currentObject.G7Type <> g7oStep) then Continue;
 
       // If RoundStates
-      if (CBRoundStates.Checked and (trim(G7Objects[i].Code)<>'')) then begin
-        source.Append(Format('  // ObjIdx=%d => RoundState "%s" (var)',[i,G7Objects[i].name])); // bug here (solved <<code...>>)
-        source.Append('  If '+G7Objects[i].name+' Then ');
-        if (copy(G7Objects[i].Code,length(G7Objects[i].Code),1)<>chr(13)) and
-           (copy(G7Objects[i].Code,length(G7Objects[i].Code),1)<>chr(10)) then
-          G7Objects[i].Code := G7Objects[i].Code+chr(13)+chr(10);
+      if (CBRoundStates.Checked and (trim(currentObject.Code)<>'')) then begin
+        source.Append(Format('  // ObjIdx=%d => RoundState "%s" (var)',[i,currentObject.name])); // bug here (solved <<code...>>)
+        source.Append('  If '+currentObject.name+' Then ');
+        if (copy(currentObject.Code,length(currentObject.Code),1)<>chr(13)) and
+           (copy(currentObject.Code,length(currentObject.Code),1)<>chr(10)) then
+          currentObject.Code := currentObject.Code+chr(13)+chr(10);
         start:=1;
-        for j := 2 to length(G7Objects[i].Code) do begin
-          if (G7Objects[i].Code[j]<>chr(13)) Then continue;
-          maybeVar:=copy(G7Objects[i].Code,start,j-start);
+        for j := 2 to length(currentObject.Code) do begin
+          if (currentObject.Code[j]<>chr(13)) Then continue;
+          maybeVar:=copy(currentObject.Code,start,j-start);
           start:=j+2;
           if IsVar(maybeVar) then begin
             source.append('    '+maybeVar+' :=True;');
           end else begin
-            ShowMessage('Syntx error => State='+G7Objects[i].name+' => "'+maybeVar+'" Is strange');
+            ShowMessage('Syntx error => State='+currentObject.name+' => "'+maybeVar+'" Is strange');
           end;
         end;
         source.Append('  End_If;');
@@ -4919,26 +4941,26 @@ begin
       end;
 
       // if not round_states
-      if (G7Objects[i].G7Type = g7oStep) and (trim(G7Objects[i].Code)<>'') then begin
-        //source.Append(Format('  // ObjIdx=%d => Step "%s" => Cod="%s"',[i,G7Objects[i].name,G7Objects[i].Code])); // bug here
-        source.Append(Format('  // ObjIdx=%d => Step "%s" (code...)',[i,G7Objects[i].name])); // bug here (solved <<code...>>)
-        //if (trim(G7Objects[i].Code)='') then Continue;
-        source.Append('  If '+G7Objects[i].name+' Then ');
+      if (currentObject.G7Type = g7oStep) and (trim(currentObject.Code)<>'') then begin
+        //source.Append(Format('  // ObjIdx=%d => Step "%s" => Cod="%s"',[i,currentObject.name,currentObject.Code])); // bug here
+        source.Append(Format('  // ObjIdx=%d => Step "%s" (code...)',[i,currentObject.name])); // bug here (solved <<code...>>)
+        //if (trim(currentObject.Code)='') then Continue;
+        source.Append('  If '+currentObject.name+' Then ');
         // To prevent bugs, enters must be removed and
         // each line appended to the TStrings of the code
             //start:=1;
-            //for j := 2 to length(G7Objects[i].Code) do begin
-            //  if (G7Objects[i].Code[j]=chr(13)) Then begin
-            //    source.append(' '+copy(G7Objects[i].Code,start,j-start{+1}));
-            //    if ((copy(G7Objects[i].Code,j+1,1)=#13) or
-            //        (copy(G7Objects[i].Code,j+1,1)=#10)) then start:=j+2 else start:=j+1;
+            //for j := 2 to length(currentObject.Code) do begin
+            //  if (currentObject.Code[j]=chr(13)) Then begin
+            //    source.append(' '+copy(currentObject.Code,start,j-start{+1}));
+            //    if ((copy(currentObject.Code,j+1,1)=#13) or
+            //        (copy(currentObject.Code,j+1,1)=#10)) then start:=j+2 else start:=j+1;
             //  end else
-            //  if j=length(G7Objects[i].Code)Then begin
-            //    source.append(' '+copy(G7Objects[i].Code,start,j-start+1));
+            //  if j=length(currentObject.Code)Then begin
+            //    source.append(' '+copy(currentObject.Code,start,j-start+1));
             //    start:=j+2;
             //  end;
             //end;
-        MySpecialAppend(source, G7Objects[i].Code, '    ');
+        MySpecialAppend(source, currentObject.Code, '    ');
         source.Append('  End_If;');
       end;
     end;
